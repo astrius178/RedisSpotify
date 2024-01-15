@@ -1,68 +1,49 @@
 package RedisSpotify.Project;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Transaction;
 
 public class Principal 
 {
     public static void main( String[] args )
     {
+    	Jedis jedis = new Jedis("localhost", 6379);
+    	
+    	List<Artista> artistIds = new ArrayList<>();
+    	
     	try {
-            // Configura tus credenciales de Spotify
-            String clientId = "tu_client_id"; //Esta en e txt que os he pasado
-            String clientSecret = "tu_client_secret"; //Esta en e txt que os he pasado
-
-            // Paso 1: Obtener el token de acceso
-            HttpClient client = HttpClients.createDefault();
-            HttpPost post = new HttpPost("https://accounts.spotify.com/api/token");
-
-            String encoding = Base64.getEncoder().encodeToString((clientId + ":" + clientSecret).getBytes());
-            post.setHeader("Authorization", "Basic " + encoding);
-            post.setHeader("Content-Type", "application/x-www-form-urlencoded");
-            post.setEntity(new StringEntity("grant_type=client_credentials"));
-
-            HttpResponse response = client.execute(post);
-            String json = EntityUtils.toString(response.getEntity());
-            JsonObject jsonObject = JsonParser.parseString(json).getAsJsonObject();
-            String accessToken = jsonObject.get("access_token").getAsString();
-
-            // Paso 2: Realizar una solicitud para obtener artistas
-            String query = "Bad"; // Reemplaza con el nombre del artista que deseas buscar
-            query = URLEncoder.encode(query, StandardCharsets.UTF_8);
-
-            HttpGet getArtists = new HttpGet("https://api.spotify.com/v1/search?q=" + query + "&type=artist");
-            getArtists.setHeader("Authorization", "Bearer " + accessToken);
-
-            HttpResponse artistResponse = client.execute(getArtists);
-            String artistJson = EntityUtils.toString(artistResponse.getEntity());
-            JsonObject artistObject = JsonParser.parseString(artistJson).getAsJsonObject();
-
-            // Procesar la respuesta para obtener los artistas
-            JsonObject artists = artistObject.getAsJsonObject("artists");
-            JsonArray items = artists.getAsJsonArray("items");
-
-            for (JsonElement item : items) {
-                JsonObject artist = item.getAsJsonObject();
-                String artistName = artist.get("name").getAsString();
-                System.out.println("Artista: " + artistName);
-            }
+			String acceso = APISpotify.getAccessToken();
+			Scanner scanner = new Scanner(System.in);
+			System.out.println("Introduce el nombre del artisata a buscar:");
+		    String nombreArtista = scanner.nextLine();
+			artistIds = APISpotify.getSampleArtistIds(acceso,nombreArtista);
+			for (Artista ar:artistIds) {
+				System.out.println(ar);
+				guardarArtistaRedis(jedis, ar);
+			}
+			
+		} catch (Exception e) {
+			
+			e.printStackTrace();
+		}
+    }
+    private static void guardarArtistaRedis(Jedis jedis, Artista artista) {
+        String key = "artista:" + artista.getId();
+        String nombre = artista.getNombre();
+       
+        // Iniciar una transacción
+        Transaction t = jedis.multi();
+        try {
+            t.set(key, nombre);
+            // Ejecutar la transacción
+            t.exec();
         } catch (Exception e) {
-            e.printStackTrace();
+            // En caso de error, descartar la transacción
+            t.discard();
         }
     }
 }
