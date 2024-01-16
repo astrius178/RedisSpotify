@@ -29,6 +29,7 @@ public class Principal
 		} catch (Exception e) {
 			
 			e.printStackTrace();
+		System.out.println("hola");
 		}
     }
     private static void guardarArtistaRedis(Jedis jedis, Artista artista) {
