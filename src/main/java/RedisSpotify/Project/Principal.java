@@ -27,7 +27,7 @@ public class Principal
 			}
 			
 		} catch (Exception e) {
-			
+			System.out.println("Introduce el nombre del artisata a buscar:");
 			e.printStackTrace();
 		}
     }
